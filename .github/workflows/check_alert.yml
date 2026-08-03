@@ -1,4 +1,4 @@
-name: Check MWRD alert
+name: Check ETF alerts
 
 on:
   schedule:
@@ -32,9 +32,9 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TICKER: "MWRD.MI"
+          TICKERS: "MWRD.MI,EMAE.MI"
           DROP_THRESHOLD: "0.05"
-        run: python alert_mwrd.py
+        run: python alert_etf.py
 
       - name: Commit updated state
         run: |
