@@ -1,4 +1,5 @@
 {
-  "max_price": 158.4199981689453,
-  "alert_sent_for_this_drawdown": false
+  "reference_price": null,
+  "alert_count": 0,
+  "last_run": null
 }

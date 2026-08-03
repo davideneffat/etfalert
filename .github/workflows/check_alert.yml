@@ -2,9 +2,12 @@ name: Check MWRD alert
 
 on:
   schedule:
-    # Ogni 30 minuti, dal lunedì al venerdì, dalle 8:00 alle 18:00 UTC
-    # (copre l'orario di Borsa Italiana/Xetra in orario CET/CEST)
-    - cron: "*/30 8-18 * * 1-5"
+    # Una volta al giorno, lun-ven, alle 17:00 UTC (dopo la chiusura di
+    # Borsa Italiana/Xetra, che chiudono verso le 17:30-17:35 CET/CEST).
+    # NB: essendo UTC fisso, con il cambio ora legale l'orario locale
+    # effettivo si sposta di un'ora tra inverno ed estate (18:00 CET
+    # d'inverno, 19:00 CEST d'estate) — comunque sempre a mercato chiuso.
+    - cron: "0 17 * * 1-5"
   workflow_dispatch: {}  # permette di lanciarlo manualmente da GitHub
 
 permissions:
