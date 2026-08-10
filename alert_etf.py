@@ -4,13 +4,20 @@ Alert Telegram "a cascata" su più ETF (MWRD, EMAE, ...).
 
 Per ciascun ticker in TICKERS (lista separata da virgola):
 1. Il riferimento iniziale è il massimo di prezzo dell'ultimo anno (365
-   giorni, ricalcolato ogni volta sui dati reali).
-2. Quando il prezzo scende di almeno il 5% da quel riferimento, arriva un
-   alert e il riferimento si sposta al prezzo appena notificato.
+   giorni, ricalcolato ogni volta sui dati reali). Questo valore viene anche
+   salvato come "peak_price" (il vero massimo storico osservato).
+2. Quando il prezzo scende di almeno il 5% dal riferimento, arriva un alert
+   e il riferimento si sposta al prezzo appena notificato (la cascata scende),
+   mentre peak_price NON cambia.
 3. Il prossimo alert scatta quando si scende un altro 5% da quel nuovo
    valore, e così via (cascata).
-4. Se il prezzo risale sopra il massimo attuale a 1 anno, il riferimento si
-   resetta al nuovo massimo e la cascata riparte da zero.
+4. Se il prezzo risale sopra peak_price (un genuino nuovo massimo, mai
+   toccato prima), sia il riferimento che peak_price si resettano al nuovo
+   massimo e la cascata riparte da zero.
+
+Nota: peak_price è distinto dal riferimento della cascata apposta per non
+confondere "il massimo a 1 anno è ancora più alto del riferimento attuale
+perché la cascata è scesa" con "è stato appena fatto un nuovo massimo vero".
 
 Lo stato di ogni ticker è indipendente e persistito in state.json, con
 struttura: {"MWRD.MI": {...}, "EMAE.MI": {...}}.
@@ -95,23 +102,34 @@ def process_ticker(ticker: str, ticker_state: dict) -> dict:
     year_high_date = history["Close"].idxmax().strftime("%Y-%m-%d")
 
     reference_price = ticker_state.get("reference_price")
+    peak_price = ticker_state.get("peak_price")
 
-    # Primo avvio per questo ticker: inizializza col massimo a 1 anno
+    # Primo avvio per questo ticker: inizializza col massimo a 1 anno.
+    # peak_price è il "vero" massimo mai osservato da quando tracciamo questo
+    # ticker: serve a distinguere un genuino nuovo massimo da un vecchio
+    # massimo che è semplicemente ancora dentro la finestra di 365 giorni
+    # (altrimenti, dopo che la cascata scende, year_high resterebbe sempre
+    # più alto del reference_price attuale e triggererebbe un reset ogni
+    # giorno anche senza nessun nuovo massimo reale).
     if reference_price is None:
         log.info(
             f"[{ticker}] Inizializzazione: riferimento impostato al massimo "
             f"a 1 anno {year_high:.2f} (del {year_high_date})"
         )
-        return {"reference_price": year_high, "alert_count": 0}
+        return {"reference_price": year_high, "peak_price": year_high, "alert_count": 0}
 
-    # Nuovo massimo a 1 anno superiore al riferimento attuale -> reset cascata
     alert_count = ticker_state.get("alert_count", 0)
-    if year_high > reference_price:
+
+    # Reset della cascata SOLO se è stato fatto un nuovo massimo genuino,
+    # cioè superiore al massimo più alto mai registrato finora (non al
+    # riferimento attuale, che per design scende con la cascata).
+    if year_high > peak_price:
         log.info(
             f"[{ticker}] Nuovo massimo a 1 anno: {year_high:.2f} (precedente "
-            f"riferimento {reference_price:.2f}). Reset della cascata."
+            f"massimo registrato {peak_price:.2f}). Reset della cascata."
         )
         reference_price = year_high
+        peak_price = year_high
         alert_count = 0
 
     drawdown = (reference_price - current_price) / reference_price
@@ -134,7 +152,7 @@ def process_ticker(ticker: str, ticker_state: dict) -> dict:
         log.info(f"[{ticker}] Alert inviato su Telegram.")
         reference_price = current_price  # la cascata scende
 
-    return {"reference_price": reference_price, "alert_count": alert_count}
+    return {"reference_price": reference_price, "peak_price": peak_price, "alert_count": alert_count}
 
 
 def main() -> None:

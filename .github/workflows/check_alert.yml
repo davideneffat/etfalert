@@ -16,6 +16,7 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 5  # evita hang lunghi (es. rete Yahoo che non risponde)
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -37,6 +38,7 @@ jobs:
         run: python alert_etf.py
 
       - name: Commit updated state
+        if: always()  # committa anche se un ticker è fallito, per non perdere lo stato degli altri
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
