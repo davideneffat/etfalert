@@ -1,11 +1,11 @@
 {
   "MWRD.MI": {
-    "reference_price": 161.58999633789062,
+    "reference_price": 161.67999267578125,
     "alert_count": 0
   },
   "EMAE.MI": {
-    "reference_price": 108.47000122070312,
+    "reference_price": 107.87999725341797,
     "alert_count": 1
   },
-  "last_run": "2026-08-07T17:44:00.015207+00:00"
+  "last_run": "2026-08-10T17:47:06.919854+00:00"
 }
