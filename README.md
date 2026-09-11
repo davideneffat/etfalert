@@ -1,109 +1,104 @@
-# Alert Telegram multi-ETF "a cascata"
+# Alert Telegram multi-ETF a cascata
 
-Sistema gratuito che controlla **una volta al giorno** (a mercato chiuso) il
-prezzo di più ETF — attualmente **MWRD.MI** e **EMAE.MI** — e invia un
-messaggio Telegram con questa logica (indipendente per ciascun ticker):
+Il progetto controlla una volta al giorno uno o più ETF e invia un messaggio
+Telegram quando la chiusura scende almeno della percentuale configurata. Ogni
+ticker mantiene una cascata e uno stato indipendenti.
 
-1. Il riferimento iniziale è il **massimo di prezzo dell'ultimo anno** (365
-   giorni, ricalcolato ogni volta sui dati reali).
-2. Quando il prezzo scende di almeno il 5% da quel riferimento, arriva un
-   alert e il riferimento **si sposta al prezzo appena notificato**.
-3. Il prossimo alert scatta quando si scende un altro 5% da quel nuovo
-   valore, e così via — è una cascata di soglie via via più basse.
-4. Se il prezzo risale sopra il massimo attuale a 1 anno (nuovo massimo), il
-   riferimento si resetta al nuovo massimo e la cascata riparte da zero.
-   (Questa è una scelta di default sensata ma non esplicitamente richiesta:
-   se preferisci che la cascata NON si resetti mai fino a un tuo intervento
-   manuale, dimmelo e tolgo questa parte.)
+## Come funziona
 
-## 1. Crea il bot Telegram (2 minuti)
+Al primo controllo il riferimento viene impostato al massimo dei prezzi di
+chiusura rettificati nel periodo configurato e non viene inviato alcun alert.
+Quando il prezzo scende almeno del 5% dal riferimento, viene inviato un solo
+alert e il riferimento passa alla chiusura appena notificata. Un calo ulteriore
+del 5% genera lo scalino successivo.
 
-1. Apri Telegram, cerca **@BotFather** e avvia una chat.
-2. Manda `/newbot`, segui le istruzioni (nome e username del bot).
-3. BotFather ti darà un **token** tipo `123456789:AAExxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`.
-   Salvalo, è il tuo `TELEGRAM_TOKEN`.
-4. Cerca il tuo bot appena creato su Telegram e mandagli un messaggio qualsiasi
-   (es. "ciao") — serve per "sbloccarlo" e permettergli di scriverti.
-5. Recupera il tuo `chat_id` **da terminale** (evita il browser per non
-   lasciare il token in chiaro nella cronologia/screenshot):
-   ```
-   curl "https://api.telegram.org/bot<IL_TUO_TOKEN>/getUpdates"
-   ```
-   e cerca nel JSON restituito il campo `"chat":{"id": ...}`. Quel numero è il
-   tuo `TELEGRAM_CHAT_ID`.
+`peak_price` conserva il massimo più alto osservato dal sistema. La cascata si
+azzera solo quando i dati scaricati contengono un massimo superiore a questo
+valore. Non si azzera semplicemente perché un vecchio massimo è ancora nella
+finestra mobile.
 
-## 2. Crea un repository GitHub (gratuito)
+Un forte ribasso che attraversa più scalini produce un solo alert per quella
+quotazione. Lo stato registra anche la data dell'ultima quotazione notificata,
+così una nuova esecuzione sulla stessa chiusura non ripete l'alert quando lo
+stato precedente è stato salvato correttamente.
 
-1. Vai su github.com, crea un nuovo repository (può essere privato).
-2. Carica tutti i file di questo progetto (`alert_etf.py`, `requirements.txt`,
-   `state.json`, la cartella `.github/workflows/check_alert.yml`) mantenendo
-   la stessa struttura di cartelle.
-   - Via web: usa "Add file" → "Upload files" e trascina tutto.
-   - Via git (da terminale, dentro la cartella del progetto):
-     ```
-     git init
-     git add .
-     git commit -m "Setup alert ETF"
-     git branch -M main
-     git remote add origin https://github.com/<tuo-utente>/<tuo-repo>.git
-     git push -u origin main
-     ```
+## Configurazione
 
-## 3. Configura i secrets su GitHub
+Creare un bot con [@BotFather](https://t.me/BotFather), inviargli un primo
+messaggio e configurare questi repository secret in **Settings → Secrets and
+variables → Actions**:
 
-Nel repository: **Settings → Secrets and variables → Actions → New repository secret**
+- `TELEGRAM_TOKEN`: token del bot;
+- `TELEGRAM_CHAT_ID`: identificativo della chat destinataria.
 
-- `TELEGRAM_TOKEN` → il token ottenuto da BotFather
-- `TELEGRAM_CHAT_ID` → il chat_id ottenuto sopra
+Il workflow usa queste variabili d'ambiente:
 
-## 4. Attiva il workflow
+| Variabile | Default | Significato |
+|---|---:|---|
+| `TICKERS` | `MWRD.MI,EMAE.MI` | Ticker Yahoo Finance separati da virgole |
+| `DROP_THRESHOLD` | `0.05` | Calo necessario per un alert |
+| `LOOKBACK_DAYS` | `365` | Periodo richiesto a Yahoo Finance |
+| `MAX_PRICE_AGE_DAYS` | `7` | Età massima accettata per l'ultima quotazione |
+| `STATE_FILE` | `state.json` accanto allo script | Percorso dello stato |
 
-Il file `.github/workflows/check_alert.yml` è già pronto: gira automaticamente
-una volta al giorno, lun-ven, alle 17:00 UTC (a mercato chiuso), controllando
-entrambi i ticker in un unico run.
+La soglia deve essere compresa tra 0 e 1, il periodo deve essere di almeno 30
+giorni e l'età massima non può essere negativa. Ticker duplicati vengono
+rimossi. I token Telegram vengono richiesti solo nelle esecuzioni reali.
 
-Per testarlo subito senza aspettare: vai su **Actions** nel repository →
-seleziona il workflow "Check ETF alerts" → **Run workflow** (pulsante
-manuale, grazie a `workflow_dispatch`).
+## Esecuzione
 
-Al primo avvio lo script non invia nessun alert per nessuno dei due ticker:
-inizializza semplicemente il riferimento con il massimo a 1 anno di ciascuno.
-Da lì in poi traccia la cascata e ti avvisa quando scende del 5%.
+Installare le dipendenze:
 
-## Note
+```bash
+python -m pip install -r requirements.txt
+```
 
-- **Costo**: zero. Con un run al giorno l'utilizzo di GitHub Actions è
-  trascurabile (pochi secondi/giorno), ben dentro il piano gratuito anche su
-  repo privati.
-- **Multi-ticker indipendente**: ogni ticker ha il proprio riferimento e la
-  propria cascata in `state.json` (struttura `{"MWRD.MI": {...}, "EMAE.MI":
-  {...}}`), quindi un drawdown su uno non influenza l'altro.
-- **Aggiungere altri ETF**: basta aggiungere il ticker (con suffisso Yahoo
-  Finance corretto, es. `.MI` per Borsa Italiana) alla variabile `TICKERS`
-  nel workflow, separato da virgola — es. `"MWRD.MI,EMAE.MI,XXXX.MI"`. Lo
-  stato per il nuovo ticker si inizializza da solo al primo run.
-- **Resilienza per ticker**: se il download dati fallisce per un ticker (es.
-  Yahoo temporaneamente irraggiungibile), lo script salta solo quel ticker,
-  mantiene il suo stato precedente e continua con gli altri; il job GitHub
-  Actions risulta comunque "failed" per farti sapere che qualcosa è andato
-  storto, ma senza perdere lo storico di chi ha funzionato.
-- **Un solo alert per soglia al giorno**: dato che il check gira una volta al
-  giorno sul prezzo di chiusura, ricevi al massimo un alert al giorno per
-  ticker, esattamente quando si supera la prossima soglia della cascata.
-- **Gap improvvisi**: se in un giorno solo il prezzo crolla più del 5%, lo
-  script invia comunque **un solo alert quel giorno** (drawdown effettivo
-  riportato nel messaggio), non uno per ogni "scalino" teoricamente
-  attraversato. La cascata riparte comunque dal nuovo prezzo.
-- **Retry automatici**: se Yahoo Finance risponde con errore temporaneo o
-  rate-limit, lo script ritenta fino a 3 volte con 5 secondi di pausa per
-  ogni ticker prima di arrendersi su quello specifico.
-- **Cambiare soglia, ticker o finestra del massimo**: modifica `DROP_THRESHOLD`,
-  `TICKERS` e `LOOKBACK_DAYS` direttamente nel file
-  `.github/workflows/check_alert.yml` (variabili d'ambiente del job).
-- **Orario del check**: 17:00 UTC, dopo la chiusura di Borsa Italiana/Xetra.
-  Se preferisci un altro orario, basta cambiare l'espressione cron in
-  `check_alert.yml`.
-- **Sicurezza del token**: ricordati di non condividere mai screenshot o URL
-  contenenti `TELEGRAM_TOKEN` — se il token attuale è mai stato esposto,
-  rigeneralo da BotFather (`/mybots` → il tuo bot → API Token → Revoke) e
-  aggiorna il secret su GitHub.
+Per verificare prezzi, logica e messaggio senza inviare nulla e senza modificare
+`state.json`:
+
+```bash
+python alert_etf.py --dry-run
+```
+
+Per un'esecuzione reale:
+
+```bash
+TELEGRAM_TOKEN="..." TELEGRAM_CHAT_ID="..." python alert_etf.py
+```
+
+I test non usano rete né Telegram:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+## Automazione GitHub
+
+[Il workflow](.github/workflows/check_alert.yml) parte dal lunedì al venerdì
+alle 17:00 UTC e può essere avviato manualmente dalla pagina Actions. Le
+esecuzioni sono serializzate per impedire che due job aggiornino
+contemporaneamente `state.json`. Al termine, lo stato viene salvato con un
+commit automatico.
+
+Se un ticker fallisce, gli altri vengono comunque elaborati, lo stato del
+ticker fallito viene conservato e il job termina con errore. Prezzi vuoti,
+non numerici, non positivi o più vecchi di `MAX_PRICE_AGE_DAYS` vengono
+rifiutati. Lo stato viene scritto atomicamente per evitare file JSON parziali.
+
+Il workflow esegue anche i test a ogni modifica dei file applicativi. Le
+dipendenze dirette sono bloccate a versioni precise per rendere le installazioni
+ripetibili; gli aggiornamenti vanno applicati e verificati esplicitamente.
+
+## Limiti operativi
+
+Yahoo Finance non offre una garanzia di servizio per questo utilizzo. I prezzi
+sono quelli restituiti da `yfinance` con rettifica automatica; una rettifica
+storica può modificare i massimi calcolati rispetto a esecuzioni precedenti.
+
+Telegram non espone una chiave di idempotenza per `sendMessage`. La data
+dell'ultima quotazione riduce i duplicati nelle normali riesecuzioni, ma resta
+un piccolo intervallo tra consegna del messaggio e salvataggio dello stato:
+un arresto proprio in quell'intervallo può causare un duplicato.
+
+Non inserire mai il token Telegram nel repository, nei log o negli screenshot.
+Se è stato esposto, revocarlo con BotFather e aggiornare il secret.

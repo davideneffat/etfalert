@@ -1,2 +1,2 @@
-yfinance>=0.2.40
-requests>=2.31.0
+yfinance==1.7.0
+requests==2.34.2

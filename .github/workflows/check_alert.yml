@@ -1,6 +1,19 @@
 name: Check ETF alerts
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "alert_etf.py"
+      - "requirements.txt"
+      - "tests/**"
+      - ".github/workflows/check_alert.yml"
+  pull_request:
+    paths:
+      - "alert_etf.py"
+      - "requirements.txt"
+      - "tests/**"
+      - ".github/workflows/check_alert.yml"
   schedule:
     # Una volta al giorno, lun-ven, alle 17:00 UTC (dopo la chiusura di
     # Borsa Italiana/Xetra, che chiudono verso le 17:30-17:35 CET/CEST).
@@ -11,10 +24,17 @@ on:
   workflow_dispatch: {}  # permette di lanciarlo manualmente da GitHub
 
 permissions:
-  contents: write  # serve per ricommittare state.json
+  contents: read
+
+concurrency:
+  group: etf-alert-state
+  cancel-in-progress: false
 
 jobs:
   check:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write  # serve per ricommittare state.json
     runs-on: ubuntu-latest
     timeout-minutes: 5  # evita hang lunghi (es. rete Yahoo che non risponde)
     steps:
@@ -35,6 +55,8 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TICKERS: "MWRD.MI,EMAE.MI"
           DROP_THRESHOLD: "0.05"
+          LOOKBACK_DAYS: "365"
+          MAX_PRICE_AGE_DAYS: "7"
         run: python alert_etf.py
 
       - name: Commit updated state
@@ -44,4 +66,15 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add state.json
           git diff --staged --quiet || git commit -m "Aggiorna state.json [skip ci]"
+          git pull --rebase
           git push
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
