@@ -1,13 +1,15 @@
 {
-  "MWRD.MI": {
-    "reference_price": 162.47000122070312,
-    "peak_price": 162.47000122070312,
-    "alert_count": 0
-  },
   "EMAE.MI": {
-    "reference_price": 107.87999725341797,
+    "alert_count": 1,
+    "last_successful_check": "2026-09-11T19:24:04.657159+00:00",
     "peak_price": 122.16000366210938,
-    "alert_count": 1
+    "reference_price": 107.87999725341797
   },
-  "last_run": "2026-09-10T19:26:17.363069+00:00"
+  "MWRD.MI": {
+    "alert_count": 0,
+    "last_successful_check": "2026-09-11T19:24:04.443193+00:00",
+    "peak_price": 162.47000122070312,
+    "reference_price": 162.47000122070312
+  },
+  "last_run": "2026-09-11T19:24:04.657289+00:00"
 }
