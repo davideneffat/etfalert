@@ -2,7 +2,7 @@
   "EMAE.MI": {
     "alert_count": 3,
     "last_alert_quote_date": "2026-11-20",
-    "last_successful_check": "2026-11-24T03:08:04.791518+00:00",
+    "last_successful_check": "2026-11-25T01:13:44.556610+00:00",
     "peak_price": 122.16000366210938,
     "reference_price": 94.05999755859375
   },
@@ -13,5 +13,5 @@
     "peak_price": 166.1699981689453,
     "reference_price": 154.17999267578125
   },
-  "last_run": "2026-11-24T03:08:04.791630+00:00"
+  "last_run": "2026-11-25T01:13:44.556717+00:00"
 }
